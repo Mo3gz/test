@@ -17,17 +17,23 @@ const teamNames = {
   9: 'e',
   10: 'f'
 };
+const scoresFilePath = path.join('D:/home', 'scores.txt');
 
-const scoresFilePath = path.join(__dirname, 'scores.txt');
-
-// Initialize scores file with default data if it doesn't exist
-if (!fs.existsSync(scoresFilePath)) {
-  const initialScores = Array.from({ length: 10 }, (_, i) => ({
-    teamNumber: i + 1,
-    score: 0
-  }));
-  fs.writeFileSync(scoresFilePath, JSON.stringify(initialScores, null, 2));
-}
+// Function to initialize scores file with default data if it doesn't exist
+const initializeScoresFile = () => {
+  if (!fs.existsSync(scoresFilePath)) {
+    const initialScores = Array.from({ length: 10 }, (_, i) => ({
+      teamNumber: i + 1,
+      score: 0
+    }));
+    try {
+      fs.writeFileSync(scoresFilePath, JSON.stringify(initialScores, null, 2));
+      console.log('Initialized scores file with default data');
+    } catch (error) {
+      console.error('Error initializing scores file:', error);
+    }
+  }
+};
 
 // Middleware to parse JSON bodies
 app.use(express.json());
