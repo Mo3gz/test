@@ -7,16 +7,16 @@ const port = 3000;
 
 // Team names mapping
 const teamNames = {
-  1: 'Sofia',
-  2: 'John',
-  3: 'Sarah',
-  4: 'Mike',
-  5: 'a',
-  6: 'b',
-  7: 'c',
-  8: 'd',
-  9: 'e',
-  10: 'f'
+  1: 'صوفيا',
+  2: 'تاييس',
+  3: 'ايميلي',
+  4: 'مرتا',
+  5: 'سالومي',
+  6: 'ارميا',
+  7: 'دانيال',
+  8: 'أشعياء',
+  9: 'حزقيال',
+  10: 'موسي'
 };
 
 // Middleware to parse JSON bodies
