@@ -1,0 +1,42 @@
+[
+  {
+    "teamNumber": 1,
+    "score": 0
+  },
+  {
+    "teamNumber": 2,
+    "score": 0
+  },
+  {
+    "teamNumber": 3,
+    "score": 30
+  },
+  {
+    "teamNumber": 4,
+    "score": 0
+  },
+  {
+    "teamNumber": 5,
+    "score": 0
+  },
+  {
+    "teamNumber": 6,
+    "score": 0
+  },
+  {
+    "teamNumber": 7,
+    "score": 0
+  },
+  {
+    "teamNumber": 8,
+    "score": 0
+  },
+  {
+    "teamNumber": 9,
+    "score": 0
+  },
+  {
+    "teamNumber": 10,
+    "score": 0
+  }
+]
