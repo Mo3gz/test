@@ -1,10 +1,11 @@
 const express = require('express');
-const fs = require('fs');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 const path = require('path');
 const cors = require('cors'); // CORS support for development
 const app = express();
 const port = 3000;
 
+// Team names mapping
 const teamNames = {
   1: 'Sofia',
   2: 'John',
@@ -17,85 +18,113 @@ const teamNames = {
   9: 'e',
   10: 'f'
 };
-const scoresFilePath = path.join('D:/home', 'scores.txt');
-
-// Function to initialize scores file with default data if it doesn't exist
-const initializeScoresFile = () => {
-  if (!fs.existsSync(scoresFilePath)) {
-    const initialScores = Array.from({ length: 10 }, (_, i) => ({
-      teamNumber: i + 1,
-      score: 0
-    }));
-    try {
-      fs.writeFileSync(scoresFilePath, JSON.stringify(initialScores, null, 2));
-      console.log('Initialized scores file with default data');
-    } catch (error) {
-      console.error('Error initializing scores file:', error);
-    }
-  }
-};
 
 // Middleware to parse JSON bodies
 app.use(express.json());
-app.use(cors()); // Enable CORS for development
+app.use(cors());
 
-// Helper function to read scores from file
-const readScores = () => {
-  const data = fs.readFileSync(scoresFilePath, 'utf-8');
-  return JSON.parse(data);
-};
+// MongoDB Atlas connection URI
+require('dotenv').config();
+const uri = process.env.MONGO_URI;
 
-// Helper function to write scores to file
-const writeScores = (scores) => {
-  fs.writeFileSync(scoresFilePath, JSON.stringify(scores, null, 2));
-};
 
-// Get all scores
-app.get('/api/scores', (req, res) => {
+const DATABASE_NAME = 'scoreboard';
+const COLLECTION_NAME = 'scores';
+
+// Create a MongoClient with MongoClientOptions to set the Stable API version
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  }
+});
+
+let db, collection;
+
+// Connect to MongoDB and initialize database
+async function connectToDatabase() {
   try {
-    const scores = readScores();
-    const scoresArr = scores.map(row => ({
+    // Connect the client to MongoDB Atlas
+    await client.connect();
+    console.log("Connected to MongoDB Atlas!");
+
+    // Access the database and collection
+    db = client.db(DATABASE_NAME);
+    collection = db.collection(COLLECTION_NAME);
+
+    // Initialize the database with default scores if empty
+    await initDatabase();
+  } catch (err) {
+    console.error("Error connecting to MongoDB:", err);
+  }
+}
+
+// Function to initialize the database with default data
+async function initDatabase() {
+  try {
+    const count = await collection.countDocuments();
+    if (count === 0) {
+      const teamData = Array.from({ length: 10 }, (_, i) => ({
+        teamNumber: i + 1,
+        score: 0
+      }));
+      await collection.insertMany(teamData);
+      console.log('Inserted initial data into MongoDB');
+    }
+  } catch (err) {
+    console.error("Error initializing database:", err);
+  }
+}
+
+// GET route to fetch all scores
+app.get('/api/scores', async (req, res) => {
+  try {
+    const scores = await collection.find({}).toArray();
+    const scoresArr = scores.map((row) => ({
       teamNumber: row.teamNumber,
       teamName: teamNames[row.teamNumber] || `Team ${row.teamNumber}`,
       score: row.score
     }));
     res.json(scoresArr);
-  } catch (error) {
-    console.error('Error reading scores:', error);
+  } catch (err) {
+    console.error('Error fetching scores:', err);
     res.status(500).json({ message: 'Error fetching scores' });
   }
 });
 
-// Update a team's score
-app.put('/api/scores/:teamNumber', (req, res) => {
+// PUT route to update score for a specific team
+app.put('/api/scores/:teamNumber', async (req, res) => {
   const teamNumber = parseInt(req.params.teamNumber);
   const newScore = req.body.score;
 
   if (isNaN(newScore) || teamNumber < 1 || teamNumber > 10) {
-    return res.status(400).json({ message: "Invalid team number or score." });
+    return res.status(400).json({ message: 'Invalid team number or score.' });
   }
 
   try {
-    const scores = readScores();
-    const team = scores.find(t => t.teamNumber === teamNumber);
+    const result = await collection.updateOne(
+      { teamNumber },
+      { $set: { score: newScore } },
+      { upsert: true }
+    );
 
-    if (team) {
-      team.score = newScore;
-      writeScores(scores);
-      res.json({ message: "Score updated successfully!" });
+    if (result.acknowledged) {
+      res.json({ message: 'Score updated successfully!' });
     } else {
-      res.status(404).json({ message: "Team not found." });
+      res.status(500).json({ message: 'Error updating score.' });
     }
-  } catch (error) {
-    console.error('Error updating score:', error);
-    res.status(500).json({ message: "Error updating score." });
+  } catch (err) {
+    console.error('Error updating score:', err);
+    res.status(500).json({ message: 'Error updating score.' });
   }
 });
 
 // Serve static files (public directory) for frontend
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Start the server
-app.listen(port, () => {
+// Start the server and connect to MongoDB
+app.listen(port, async () => {
   console.log(`Server is running on http://localhost:${port}`);
+  await connectToDatabase();
 });
