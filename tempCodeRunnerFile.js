@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS scores (
-    teamName INTEGER PRIMARY KEY,
-    score INTEGER
-  );
