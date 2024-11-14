@@ -1,75 +1,60 @@
 const express = require('express');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const path = require('path');
-const cors = require('cors'); // CORS support for development
+const cors = require('cors');
+const http = require('http'); // Required to use Socket.IO with Express
+const socketIo = require('socket.io'); // Real-time communication
+require('dotenv').config();
+
 const app = express();
 const port = 3000;
+const server = http.createServer(app);
+const io = socketIo(server); // Attach Socket.IO to server
 
 // Team names mapping
 const teamNames = {
-  1: 'صوفيا',
-  2: 'تاييس',
-  3: 'ايميلي',
-  4: 'مرتا',
-  5: 'سالومي',
-  6: 'ارميا',
-  7: 'دانيال',
-  8: 'أشعياء',
-  9: 'حزقيال',
-  10: 'موسي'
+  1: 'صوفيا', 2: 'تاييس', 3: 'ايميلي', 4: 'مرتا', 5: 'سالومي',
+  6: 'ارميا', 7: 'دانيال', 8: 'أشعياء', 9: 'حزقيال', 10: 'موسي'
 };
 
-// Middleware to parse JSON bodies
 app.use(express.json());
 app.use(cors());
-
-// MongoDB Atlas connection URI
-require('dotenv').config();
-const uri = process.env.MONGO_URI;
-
+app.use(express.static(path.join(__dirname, 'public')));
 
 const DATABASE_NAME = 'scoreboard';
 const COLLECTION_NAME = 'scores';
 
-// Create a MongoClient with MongoClientOptions to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
+const client = new MongoClient(process.env.MONGO_URI, {
+  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true }
 });
 
-let db, collection;
+let collection;
 
 // Connect to MongoDB and initialize database
 async function connectToDatabase() {
   try {
-    // Connect the client to MongoDB Atlas
     await client.connect();
     console.log("Connected to MongoDB Atlas!");
-
-    // Access the database and collection
-    db = client.db(DATABASE_NAME);
+    const db = client.db(DATABASE_NAME);
     collection = db.collection(COLLECTION_NAME);
-
-    // Initialize the database with default scores if empty
     await initDatabase();
+    setupChangeStream(); // Set up change stream for real-time updates
   } catch (err) {
     console.error("Error connecting to MongoDB:", err);
+    process.exit(1);
   }
 }
 
-// Function to initialize the database with default data
+// Function to initialize the database with default data if empty
 async function initDatabase() {
   try {
     const count = await collection.countDocuments();
     if (count === 0) {
-      const teamData = Array.from({ length: 10 }, (_, i) => ({
+      const initialData = Array.from({ length: 10 }, (_, i) => ({
         teamNumber: i + 1,
         score: 0
       }));
-      await collection.insertMany(teamData);
+      await collection.insertMany(initialData);
       console.log('Inserted initial data into MongoDB');
     }
   } catch (err) {
@@ -77,16 +62,30 @@ async function initDatabase() {
   }
 }
 
+// Set up a MongoDB change stream to listen for real-time updates
+function setupChangeStream() {
+  const changeStream = collection.watch();
+
+  changeStream.on('change', (change) => {
+    console.log('Change detected:', change);
+    io.emit('databaseChange', { change });
+  });
+
+  changeStream.on('error', (error) => {
+    console.error('Error in change stream:', error);
+  });
+}
+
 // GET route to fetch all scores
 app.get('/api/scores', async (req, res) => {
   try {
     const scores = await collection.find({}).toArray();
-    const scoresArr = scores.map((row) => ({
+    const formattedScores = scores.map(row => ({
       teamNumber: row.teamNumber,
       teamName: teamNames[row.teamNumber] || `Team ${row.teamNumber}`,
       score: row.score
     }));
-    res.json(scoresArr);
+    res.json(formattedScores);
   } catch (err) {
     console.error('Error fetching scores:', err);
     res.status(500).json({ message: 'Error fetching scores' });
@@ -109,10 +108,10 @@ app.put('/api/scores/:teamNumber', async (req, res) => {
       { upsert: true }
     );
 
-    if (result.acknowledged) {
+    if (result.modifiedCount > 0) {
       res.json({ message: 'Score updated successfully!' });
     } else {
-      res.status(500).json({ message: 'Error updating score.' });
+      res.status(404).json({ message: 'Team not found.' });
     }
   } catch (err) {
     console.error('Error updating score:', err);
@@ -120,11 +119,8 @@ app.put('/api/scores/:teamNumber', async (req, res) => {
   }
 });
 
-// Serve static files (public directory) for frontend
-app.use(express.static(path.join(__dirname, 'public')));
-
 // Start the server and connect to MongoDB
-app.listen(port, async () => {
-  console.log(`Server is running on http://localhost:${port}`);
+server.listen(port, async () => {
   await connectToDatabase();
+  console.log(`Server is running on http://localhost:${port}`);
 });
