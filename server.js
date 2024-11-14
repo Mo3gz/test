@@ -25,7 +25,7 @@ app.use(cors());
 
 // MongoDB Atlas connection URI
 require('dotenv').config();
-const uri = process.env.MONGO_URI;
+const uri = process.env.MONGO_URI || "mongodb+srv://sigmanup:J2rydPN0WPGSjpvL@aymanmo3.mtjtf.mongodb.net/?retryWrites=true&w=majority&appName=Aymanmo3";
 
 const DATABASE_NAME = 'scoreboard';
 const COLLECTION_NAME = 'scores';
